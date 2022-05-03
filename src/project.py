@@ -1,5 +1,8 @@
+from matplotlib import projections
 import simcx
 import numpy as np
+from mpl_toolkits import mplot3d
+import matplotlib.patches as mpatches
 
 
 # differential equations
@@ -127,14 +130,21 @@ class MySimulatorMultipleInitStatesVisual(simcx.MplVisual):
     '''
     Visual for simulation created with MySimulatorMultipleInitStates.
     '''
-    def __init__(self, sim: MySimulatorMultipleInitStates):
-        super(MySimulatorMultipleInitStatesVisual, self).__init__(sim)
+    def __init__(self, sim: MySimulatorMultipleInitStates, width = 1500, height = 800):
+        '''
+        sim: a MySimulatorMultipleInitStates simulation.
+        width: width of the figure.
+        height: height of the figure.
+        '''
+        super(MySimulatorMultipleInitStatesVisual, self).__init__(sim, width = width, height = height)
         self.ax = self.figure.add_subplot(111)
         self.lines = []
         for i in range(len(self.sim.y)):
             for e in range(len(self.sim.y[i])):
                 line, = self.ax.plot(self.sim.x, self.sim.y[i][e], '-')
                 self.lines.append(line)
+        
+        self.ax.set_title('Orbits')
 
     def draw(self):
         line_counter = 0
@@ -192,46 +202,192 @@ class OrbitDifferenceVisual(simcx.MplVisual):
     '''
     Visual for the OrbitDifference simulation.
     '''
-    def __init__(self, sim : OrbitDifference, plot_orbits = False):
+    def __init__(self, sim : OrbitDifference, plot_orbits = False, width = 1500, height = 800):
         '''
         sim: an OrbitDifference simulation.
         plot_orbits: of false it only plots the difference lines, else it also plot the orbits of the two simulations beig compared.
-
-        The difference lines are ploted with an alpha of 0.5 and the orbit lines with an alpha of 1 (to differentiate between the two types of lines).
+        width: width of the figure.
+        height: height of the figure.
         '''
-        super(OrbitDifferenceVisual, self).__init__(sim)
+        super(OrbitDifferenceVisual, self).__init__(sim, width = width, height = height)
         self.plot_orbits = plot_orbits
+        self.ax1 = self.figure.add_subplot(1, 2, 1)
+        self.ax2 = self.figure.add_subplot(1, 2, 2)
+        self.lines1 = []
+        self.lines2 = []
+        # plot the difference lines
+        for i in range(len(self.sim.y)):
+            line, = self.ax1.plot(self.sim.x, self.sim.y[i], '-')
+            self.lines1.append(line)
+        
+        # plot the orbits
+        for i in range(len(self.sim.orbits)):
+            for e in range(len(self.sim.orbits[i])):
+                line, = self.ax2.plot(self.sim.x, self.sim.orbits[i][e], '-')
+                self.lines2.append(line)
+            
+        # set the titles etc.
+        self.ax1.set_title('Orbit Difference')
+        self.ax2.set_title('Orbits')
+
+    def draw(self):
+        for i in range(len(self.sim.y)):
+            self.lines1[i].set_data(self.sim.x, self.sim.y[i])
+        
+        line_counter = 0
+        for i in range(len(self.sim.orbits)):
+            for e in range(len(self.sim.orbits[i])):
+                self.lines2[line_counter].set_data(self.sim.x, self.sim.orbits[i][e])
+                line_counter += 1
+
+        self.ax1.relim()
+        self.ax2.relim()
+        self.ax1.autoscale_view()
+        self.ax2.autoscale_view()
+
+
+
+class MyPhaseSpace2DMultipleInitialStates(simcx.MplVisual):
+    '''
+    Visual for the phase space.
+    '''
+    def __init__(self, sim: MySimulatorMultipleInitStates, name_x, name_y, width = 1000, height = 800):
+        '''
+        sim: a MySimulatorMultipleInitStates.
+        name_x: label for the x axis.
+        name_y: label for the y axis.
+        width: width of the figure.
+        height: height of the figure.
+        '''
+        super(MyPhaseSpace2DMultipleInitialStates, self).__init__(sim, width = width, height = height)
         self.ax = self.figure.add_subplot(111)
         self.lines = []
         for i in range(len(self.sim.y)):
-            line, = self.ax.plot(self.sim.x, self.sim.y[i], '-', alpha=0.5)
+            line, = self.ax.plot(self.sim.y[i][0], self.sim.y[i][1], '-') # var 1 in the x axis and var 2 in the y axis
             self.lines.append(line)
-        
-        if self.plot_orbits:
-            for i in range(len(self.sim.orbits)):
-                for e in range(len(self.sim.orbits[i])):
-                    line, = self.ax.plot(self.sim.x, self.sim.orbits[i][e], '-')
-                    self.lines.append(line)
 
+        self.ax.set_title('Phase Space')
+        self.ax.set_xlabel(name_x)
+        self.ax.set_ylabel(name_y)
+    
     def draw(self):
-        line_counter = 0
         for i in range(len(self.sim.y)):
-            self.lines[i].set_data(self.sim.x, self.sim.y[i])
-            line_counter += 1
-        
-        if self.plot_orbits:
-            for i in range(len(self.sim.orbits)):
-                for e in range(len(self.sim.orbits[i])):
-                    self.lines[line_counter].set_data(self.sim.x, self.sim.orbits[i][e])
-                    line_counter += 1
-
+            self.lines[i].set_data(self.sim.y[i][0], self.sim.y[i][1])  # var 1 in the x axis and var 2 in the y axis
         self.ax.relim()
         self.ax.autoscale_view()
 
-# testar varios a e b
 
+class MyFinalStateIterator(simcx.simulators.Simulator):
+    '''
+    Only tries the func with different parameters starting from a specific seed (initial state).
+    Only works with functions that have two parameters to define.
+    '''
+    def __init__(self, func, seed, start, end, Dt, integration_method, discard=1000, samples=250,
+                 delta=0.01):
+        '''
+        func: function that we want to test. It receives the parameters that we want to test and returns a function with thos parameters specified.
+        seed: initial state.
+        start: list with the values from where we want to start each parameter that we want to test ([a = 0.1, b = 0.2] for example)
+        end: list with the values until where we want to test each parameter ([a = 10, b = 10] for example).
+        Dt: delta used for the numerical integration method.
+        integration_method: a function that, given the previous state, returns the new state using some numerical integration method.
+        discard: the number of samples that we want to discard at the begining of the simulation.
+        samples: the number of samples that we actually want to use from the simulation (the number of samples that we want after we discard the first n samples).
+        delta: list with the deltas used to get the next parameters values.
+        
+        Note
+        The discard value needs to take into account that, if the initial state is far from the fixed point, it will need to be a big value.
+        '''
+        super(MyFinalStateIterator, self).__init__()
+
+        self._func = func
+        self._seed = seed # initial state
+        self._a = start[:] # variable that keeps track of the func parameter that we are testing
+        self.start = start
+        self.end = end
+        self._discard = discard
+        self._samples = samples
+        self._delta = delta
+        self.integration_method = integration_method
+        self.state = seed[:] # keep track of the current state
+        self.Dt = Dt
+
+        self.x = [np.zeros(self._samples) for _ in range(len(start))]
+        self.y = [np.zeros(self._samples) for _ in range(len(seed))]
+
+    def new_parameters(self):
+        '''
+        Used to get the parameters combinations.
+        '''
+        new_a = self._a[:]
+        if self._a[1] <= self.end[1]: # se o b ainda nao chegou ao fim, incrementar
+            new_a[1] += self._delta[1]
+        else: # se o parametro b chegou ao final, incrementar o a e resetar o b
+            new_a[0] += self._delta[0]
+            new_a[1] = self.start[1]
+        self._a = new_a
+
+    def step(self, delta=0):
+        # per step it calculates the final state for all the simulations using "all" the possible values for a certain parameter
+        if self._a <= self.end: # verify if we reached the end of the simulation
+            # perform simulation for the self._a parameters
+            self.state = self._seed # initial state
+            func = self._func(*self._a) # get the function with the correct parameters
+            for _ in range(self._discard):
+                self.state = self.integration_method(func, self.state, self.Dt)
+            for i in range(self._samples):
+                self.state = self.integration_method(func, self.state, self.Dt)
+                # save the function result values
+                for e in range(len(self.state)):
+                    self.y[e][i] = self.state[e]
+                # save the parameters values
+                for e in range(len(self.start)):
+                    self.x[e][i] = self._a[e]
+            
+            # get the next parameters that we want to test the functio with
+            self.new_parameters()
+
+
+class Bifurcation3DVisual(simcx.MplVisual):
+    '''
+    Visual for the Bifurcation diagram in 3D.
+    '''
+    def __init__(self, sim: MyFinalStateIterator, name_x, name_y, name_z, width = 1000, height = 800):
+        '''
+        sim: a FinalStateIterator.
+        name_x: label for the x axis.
+        name_y: label for the y axis.
+        name_z: label for the z axis.
+        width: width of the figure.
+        height: height of the figure.
+        '''
+        super(Bifurcation3DVisual, self).__init__(sim, width = width, height = height)
+        self.ax = self.figure.add_subplot(111, projection = '3d')
+        # self.ax.view_init(20, 20)
+
+        self.ax.set_xlim(sim.start[0], sim.end[0])
+        self.ax.set_ylim(sim.start[1], sim.end[1])
+
+        self.ax.set_title(f"Bifurcation\nx0: {self.sim._seed}, deltas: {self.sim._delta}")
+        self.ax.set_xlabel(name_x)
+        self.ax.set_ylabel(name_y)
+        self.ax.set_zlabel(name_z)
+
+        # add legend to the figure
+        blue_patch = mpatches.Patch(color='blue', label='x')
+        orange_patch = mpatches.Patch(color='orange', label='y')
+        self.ax.legend(handles=[blue_patch, orange_patch])
+        
+    
+    def draw(self):
+        self.ax.scatter(self.sim.x[0], self.sim.x[1], self.sim.y[0], c = 'blue')
+        self.ax.scatter(self.sim.x[0], self.sim.x[1], self.sim.y[1], c = 'orange')
+        
 
 if '__main__' == __name__:
+
+    # set the rng seed
+    np.random.seed(0)
     
     # test various a's and b's
     a = [i * 0.5 for i in range(1, 11)]
@@ -246,20 +402,47 @@ if '__main__' == __name__:
     # x0 = [0, 1] # initial state
     # x0 = [-0.1, 0.2]
     # x0 = [-0.1, -0.2]
+    # x0 = [-10, -10]
+    # x0 = [-10, 10]
+    # x0 = [10, -10]
+    # x0 = [10, 10]
+    # x0 = [10, 0]
+    # x0 = [0, 10]
+    # x0 = [0, -10]
+
+    # define a and b
+    a_ = a[1]
+    b_ = b[1]
 
     # func = brusselator(a[0], b[1])
-    func = brusselator(a[2], b[0])
+    func = brusselator(a_, b_)
     Dt = 0.01
+
+
+    distance = 1 # distance from the fixed point, from which we want to generate random values
+    n_init_states = 50 # number of different initial states
+    initial_states = [[np.random.uniform(a_ - distance, a_ + distance), np.random.uniform(b_ / a_ - distance, b_ / a_ + distance)] for _ in range (n_init_states)]
+    # print(initial_states)
+
 
     # sim = MySimulator(func, x0, Dt, NumericalIntegration.euler)
     # sim = MySimulator(func, x0, Dt, NumericalIntegration.runge_kutta)
     # sim = OrbitDifference(func, [[0, 0], [0.1, 0.1]], Dt, NumericalIntegration.euler)
-    sim = MySimulatorMultipleInitStates(func, [[0, 0], [0.05, 0.05], [0.1, 0.1]], Dt, NumericalIntegration.euler)
+    # sim = MySimulatorMultipleInitStates(func, [[0, 0], [0.05, 0.05], [0.1, 0.1]], Dt, NumericalIntegration.euler)
+    # sim = MySimulatorMultipleInitStates(func, [[i * 0, i * 0.1] for i in range(25)], Dt, NumericalIntegration.euler)
+    # sim = MySimulatorMultipleInitStates(func, initial_states, Dt, NumericalIntegration.euler)
     # sim = MySimulatorMultipleInitStates(func, [[0, 0]], Dt, NumericalIntegration.euler)
+    sim = MyFinalStateIterator(brusselator, x0, [0.1, 0.1], [1, 1], Dt, NumericalIntegration.euler, delta = [0.05, 0.05], discard = 15000, samples = 2)
+
     
     # vis = simcx.visuals.Lines(sim)
-    # vis = OrbitDifferenceVisual(sim, False)
-    vis = MySimulatorMultipleInitStatesVisual(sim)
+    # vis = OrbitDifferenceVisual(sim, True)
+    # vis = MySimulatorMultipleInitStatesVisual(sim)
+
+    # vis = MyPhaseSpace2D(sim, 'x', 'y')
+    # vis = simcx.visuals.PhaseSpace2D(sim, 'x', 'y')
+    # vis = MyPhaseSpace2DMultipleInitialStates(sim, 'x', 'y')
+    vis = Bifurcation3DVisual(sim, 'a', 'b', 'function_output')
     
     display = simcx.Display()
     display.add_visual(vis)
