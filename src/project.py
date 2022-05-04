@@ -1,8 +1,7 @@
-from matplotlib import projections
 import simcx
 import numpy as np
-from mpl_toolkits import mplot3d
 import matplotlib.patches as mpatches
+from matplotlib.legend import Legend
 
 
 # differential equations
@@ -139,12 +138,17 @@ class MySimulatorMultipleInitStatesVisual(simcx.MplVisual):
         super(MySimulatorMultipleInitStatesVisual, self).__init__(sim, width = width, height = height)
         self.ax = self.figure.add_subplot(111)
         self.lines = []
+        line_styles = ['-', '--']
         for i in range(len(self.sim.y)):
             for e in range(len(self.sim.y[i])):
-                line, = self.ax.plot(self.sim.x, self.sim.y[i][e], '-')
+                line, = self.ax.plot(self.sim.x, self.sim.y[i][e], line_styles[e])
                 self.lines.append(line)
         
         self.ax.set_title('Orbits')
+        labels = []
+        [labels.extend(pair) for pair in [[f'x0_{i}', f'y0_{i}'] for i in range(int(len(self.lines) / 2))]]
+        leg = Legend(self.ax, self.lines, labels)
+        self.ax.add_artist(leg);
 
     def draw(self):
         line_counter = 0
@@ -230,6 +234,12 @@ class OrbitDifferenceVisual(simcx.MplVisual):
         self.ax1.set_title('Orbit Difference')
         self.ax2.set_title('Orbits')
 
+        # add legend to the figure
+        leg1 = Legend(self.ax1, self.lines1, ['difference x', 'difference y'])
+        self.ax1.add_artist(leg1)
+        leg2 = Legend(self.ax2, self.lines2, ['x0_0', 'y0_0', 'x0_1', 'y0_1'])
+        self.ax2.add_artist(leg2)
+
     def draw(self):
         for i in range(len(self.sim.y)):
             self.lines1[i].set_data(self.sim.x, self.sim.y[i])
@@ -266,7 +276,7 @@ class MyPhaseSpace2DMultipleInitialStates(simcx.MplVisual):
             line, = self.ax.plot(self.sim.y[i][0], self.sim.y[i][1], '-') # var 1 in the x axis and var 2 in the y axis
             self.lines.append(line)
 
-        self.ax.set_title('Phase Space')
+        self.ax.set_title(f'Phase Space\n{len(self.sim.state)} initial states')
         self.ax.set_xlabel(name_x)
         self.ax.set_ylabel(name_y)
     
@@ -412,7 +422,7 @@ if '__main__' == __name__:
 
     # define a and b
     a_ = a[1]
-    b_ = b[1]
+    b_ = b[0]
 
     # func = brusselator(a[0], b[1])
     func = brusselator(a_, b_)
@@ -420,7 +430,7 @@ if '__main__' == __name__:
 
 
     distance = 1 # distance from the fixed point, from which we want to generate random values
-    n_init_states = 50 # number of different initial states
+    n_init_states = 3 # number of different initial states
     initial_states = [[np.random.uniform(a_ - distance, a_ + distance), np.random.uniform(b_ / a_ - distance, b_ / a_ + distance)] for _ in range (n_init_states)]
     # print(initial_states)
 
@@ -430,19 +440,17 @@ if '__main__' == __name__:
     # sim = OrbitDifference(func, [[0, 0], [0.1, 0.1]], Dt, NumericalIntegration.euler)
     # sim = MySimulatorMultipleInitStates(func, [[0, 0], [0.05, 0.05], [0.1, 0.1]], Dt, NumericalIntegration.euler)
     # sim = MySimulatorMultipleInitStates(func, [[i * 0, i * 0.1] for i in range(25)], Dt, NumericalIntegration.euler)
-    # sim = MySimulatorMultipleInitStates(func, initial_states, Dt, NumericalIntegration.euler)
+    sim = MySimulatorMultipleInitStates(func, initial_states, Dt, NumericalIntegration.euler)
     # sim = MySimulatorMultipleInitStates(func, [[0, 0]], Dt, NumericalIntegration.euler)
-    sim = MyFinalStateIterator(brusselator, x0, [0.1, 0.1], [1, 1], Dt, NumericalIntegration.euler, delta = [0.05, 0.05], discard = 15000, samples = 2)
+    # sim = MyFinalStateIterator(brusselator, x0, [0.1, 0.1], [1, 1], Dt, NumericalIntegration.euler, delta = [0.05, 0.05], discard = 15000, samples = 2)
 
     
     # vis = simcx.visuals.Lines(sim)
     # vis = OrbitDifferenceVisual(sim, True)
     # vis = MySimulatorMultipleInitStatesVisual(sim)
 
-    # vis = MyPhaseSpace2D(sim, 'x', 'y')
-    # vis = simcx.visuals.PhaseSpace2D(sim, 'x', 'y')
-    # vis = MyPhaseSpace2DMultipleInitialStates(sim, 'x', 'y')
-    vis = Bifurcation3DVisual(sim, 'a', 'b', 'function_output')
+    vis = MyPhaseSpace2DMultipleInitialStates(sim, 'x', 'y')
+    # vis = Bifurcation3DVisual(sim, 'a', 'b', 'function_output')
     
     display = simcx.Display()
     display.add_visual(vis)
