@@ -137,6 +137,7 @@ class MySimulatorMultipleInitStatesVisual(simcx.MplVisual):
         '''
         super(MySimulatorMultipleInitStatesVisual, self).__init__(sim, width = width, height = height)
         self.ax = self.figure.add_subplot(111)
+        self.ax.grid()
         self.lines = []
         line_styles = ['-', '--']
         for i in range(len(self.sim.y)):
@@ -217,6 +218,8 @@ class OrbitDifferenceVisual(simcx.MplVisual):
         self.plot_orbits = plot_orbits
         self.ax1 = self.figure.add_subplot(1, 2, 1)
         self.ax2 = self.figure.add_subplot(1, 2, 2)
+        self.ax1.grid()
+        self.ax2.grid()
         self.lines1 = []
         self.lines2 = []
         # plot the difference lines
@@ -271,6 +274,7 @@ class MyPhaseSpace2DMultipleInitialStates(simcx.MplVisual):
         '''
         super(MyPhaseSpace2DMultipleInitialStates, self).__init__(sim, width = width, height = height)
         self.ax = self.figure.add_subplot(111)
+        self.ax.grid()
         self.lines = []
         for i in range(len(self.sim.y)):
             line, = self.ax.plot(self.sim.y[i][0], self.sim.y[i][1], '-') # var 1 in the x axis and var 2 in the y axis
@@ -424,13 +428,15 @@ if '__main__' == __name__:
     a_ = a[1]
     b_ = b[0]
 
+    # a_ = 10
+    # b_ = 5
     # func = brusselator(a[0], b[1])
     func = brusselator(a_, b_)
     Dt = 0.01
 
 
-    distance = 1 # distance from the fixed point, from which we want to generate random values
-    n_init_states = 3 # number of different initial states
+    distance = 4 # distance from the fixed point, from which we want to generate random values
+    n_init_states = 10 # number of different initial states
     initial_states = [[np.random.uniform(a_ - distance, a_ + distance), np.random.uniform(b_ / a_ - distance, b_ / a_ + distance)] for _ in range (n_init_states)]
     # print(initial_states)
 
