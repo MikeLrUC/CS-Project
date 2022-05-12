@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.patches as mpatches
 from matplotlib.legend import Legend
 
+import matplotlib.pyplot as plt
+
 
 # differential equations
 def brusselator(a, b):
@@ -129,7 +131,7 @@ class MySimulatorMultipleInitStatesVisual(simcx.MplVisual):
     '''
     Visual for simulation created with MySimulatorMultipleInitStates.
     '''
-    def __init__(self, sim: MySimulatorMultipleInitStates, width = 1500, height = 800):
+    def __init__(self, sim: MySimulatorMultipleInitStates, system_parameters_str, width = 1500, height = 800):
         '''
         sim: a MySimulatorMultipleInitStates simulation.
         width: width of the figure.
@@ -139,16 +141,18 @@ class MySimulatorMultipleInitStatesVisual(simcx.MplVisual):
         self.ax = self.figure.add_subplot(111)
         self.ax.grid()
         self.lines = []
-        line_styles = ['-', '--']
+        line_styles = ['-', '-']
+        colors = ['#1f77b4', '#ff7f0e']
         for i in range(len(self.sim.y)):
             for e in range(len(self.sim.y[i])):
-                line, = self.ax.plot(self.sim.x, self.sim.y[i][e], line_styles[e])
+                line, = self.ax.plot(self.sim.x, self.sim.y[i][e], line_styles[e], color = colors[e])
                 self.lines.append(line)
-        
-        self.ax.set_title('Orbits')
+        n_initial_states = len(self.sim.state)
+        self.ax.set_title(f'Orbits\n{n_initial_states} initial states, {system_parameters_str}')
         labels = []
-        [labels.extend(pair) for pair in [[f'x0_{i}', f'y0_{i}'] for i in range(int(len(self.lines) / 2))]]
-        leg = Legend(self.ax, self.lines, labels)
+        #[labels.extend(pair) for pair in [[f'x0_{i}', f'y0_{i}'] for i in range(int(len(self.lines) / 2))]]
+        labels = ['x', 'y'] 
+        leg = Legend(self.ax, self.lines[:2], labels)
         self.ax.add_artist(leg);
 
     def draw(self):
@@ -207,7 +211,7 @@ class OrbitDifferenceVisual(simcx.MplVisual):
     '''
     Visual for the OrbitDifference simulation.
     '''
-    def __init__(self, sim : OrbitDifference, plot_orbits = False, width = 1500, height = 800):
+    def __init__(self, sim : OrbitDifference, system_parameters_str, width = 1500, height = 800):
         '''
         sim: an OrbitDifference simulation.
         plot_orbits: of false it only plots the difference lines, else it also plot the orbits of the two simulations beig compared.
@@ -215,7 +219,6 @@ class OrbitDifferenceVisual(simcx.MplVisual):
         height: height of the figure.
         '''
         super(OrbitDifferenceVisual, self).__init__(sim, width = width, height = height)
-        self.plot_orbits = plot_orbits
         self.ax1 = self.figure.add_subplot(1, 2, 1)
         self.ax2 = self.figure.add_subplot(1, 2, 2)
         self.ax1.grid()
@@ -235,12 +238,12 @@ class OrbitDifferenceVisual(simcx.MplVisual):
             
         # set the titles etc.
         self.ax1.set_title('Orbit Difference')
-        self.ax2.set_title('Orbits')
+        self.ax2.set_title(f'Orbits\n{system_parameters_str}, initial states: {self.sim.state}')
 
         # add legend to the figure
         leg1 = Legend(self.ax1, self.lines1, ['difference x', 'difference y'])
         self.ax1.add_artist(leg1)
-        leg2 = Legend(self.ax2, self.lines2, ['x0_0', 'y0_0', 'x0_1', 'y0_1'])
+        leg2 = Legend(self.ax2, self.lines2, [f'x:{self.sim.state[0][0]}', f'y:{self.sim.state[0][1]}', f'x:{self.sim.state[1][0]}', f'y:{self.sim.state[1][1]}'])
         self.ax2.add_artist(leg2)
 
     def draw(self):
@@ -264,7 +267,7 @@ class MyPhaseSpace2DMultipleInitialStates(simcx.MplVisual):
     '''
     Visual for the phase space.
     '''
-    def __init__(self, sim: MySimulatorMultipleInitStates, name_x, name_y, width = 1000, height = 800):
+    def __init__(self, sim: MySimulatorMultipleInitStates, name_x, name_y, system_parameters, system_parameters_str, width = 1000, height = 800):
         '''
         sim: a MySimulatorMultipleInitStates.
         name_x: label for the x axis.
@@ -280,9 +283,14 @@ class MyPhaseSpace2DMultipleInitialStates(simcx.MplVisual):
             line, = self.ax.plot(self.sim.y[i][0], self.sim.y[i][1], '-') # var 1 in the x axis and var 2 in the y axis
             self.lines.append(line)
 
-        self.ax.set_title(f'Phase Space\n{len(self.sim.state)} initial states')
+        self.ax.set_title(f'Phase Space\n{len(self.sim.state)} initial states, {system_parameters_str}')
         self.ax.set_xlabel(name_x)
         self.ax.set_ylabel(name_y)
+
+        # place the theoretical fixed-point
+        fixed_point = [system_parameters[0], system_parameters[1] / system_parameters[0]]
+        self.ax.scatter(*fixed_point, color = 'black', label = 'fixed point', marker=".")
+        self.ax.legend()
     
     def draw(self):
         for i in range(len(self.sim.y)):
@@ -349,8 +357,10 @@ class MyFinalStateIterator(simcx.simulators.Simulator):
             func = self._func(*self._a) # get the function with the correct parameters
             for _ in range(self._discard):
                 self.state = self.integration_method(func, self.state, self.Dt)
+                # print(f"state: {self.state}")
             for i in range(self._samples):
                 self.state = self.integration_method(func, self.state, self.Dt)
+                # print(f"state: {self.state}")
                 # save the function result values
                 for e in range(len(self.state)):
                     self.y[e][i] = self.state[e]
@@ -394,9 +404,30 @@ class Bifurcation3DVisual(simcx.MplVisual):
         
     
     def draw(self):
-        self.ax.scatter(self.sim.x[0], self.sim.x[1], self.sim.y[0], c = 'blue')
-        self.ax.scatter(self.sim.x[0], self.sim.x[1], self.sim.y[1], c = 'orange')
+        self.ax.scatter(self.sim.x[0], self.sim.x[1], self.sim.y[0], c = 'blue', alpha = 0.1)
+        self.ax.scatter(self.sim.x[0], self.sim.x[1], self.sim.y[1], c = 'orange', alpha = 0.1)
         
+
+def get_equally_spaced_points(min_, max_, delta):
+    '''
+    min_: list with the coordinates of the left bottom point of the grid, [x_min, y_min]
+    max_: list with the coordinates of the top right point of the grid, [x_max, y_max]
+    delta: list with the deltas to use in the different axis, [delta_x, delta_y]
+    '''
+    points = []
+    n_xpoints = int((max_[0] - min_[0]) / delta[0])
+    n_ypoints = int((max_[1] - min_[1]) / delta[1])
+
+    for i in range(n_xpoints):
+        for j in range(n_ypoints):
+            point = [min_[0] + i * delta[0], min_[1] + j * delta[1]]
+            points.append(point)
+    # plt.figure()
+    # x = [point[0] for point in points]
+    # y = [point[1] for point in points]
+    # plt.scatter(x, y)
+    # plt.show()
+    return points
 
 if '__main__' == __name__:
 
@@ -425,11 +456,27 @@ if '__main__' == __name__:
     # x0 = [0, -10]
 
     # define a and b
-    a_ = a[1]
-    b_ = b[0]
+    a_ = a[0]
+    b_ = b[3]
+    # b_ = b[1]
 
-    # a_ = 10
-    # b_ = 5
+    # eventualmente da overflow
+    # a_ = 0.3
+    # b_ = 4
+
+    # a_ = 0.2
+    # b_ = 0.1
+
+    # teste (penso que deveria oscilar) (oscila!)
+    # a_ = 0.5
+    # b_ = 1.30
+
+    # spiral convergence
+    a_ = 0.5
+    b_ = 1.2
+
+    system_parameters_str = f'a: {a_}, b: {b_}'
+    system_parameters = [a_, b_]
     # func = brusselator(a[0], b[1])
     func = brusselator(a_, b_)
     Dt = 0.01
@@ -438,24 +485,29 @@ if '__main__' == __name__:
     distance = 4 # distance from the fixed point, from which we want to generate random values
     n_init_states = 10 # number of different initial states
     initial_states = [[np.random.uniform(a_ - distance, a_ + distance), np.random.uniform(b_ / a_ - distance, b_ / a_ + distance)] for _ in range (n_init_states)]
+    equally_spaced_points = get_equally_spaced_points([-4, -4], [4, 4], [2, 2])
+    # equally_spaced_points = get_equally_spaced_points([-4, 0], [4, 8], [2, 2])
     # print(initial_states)
 
 
     # sim = MySimulator(func, x0, Dt, NumericalIntegration.euler)
     # sim = MySimulator(func, x0, Dt, NumericalIntegration.runge_kutta)
-    # sim = OrbitDifference(func, [[0, 0], [0.1, 0.1]], Dt, NumericalIntegration.euler)
+    sim = OrbitDifference(func, [[0, 0], [0.1, 0.1]], Dt, NumericalIntegration.euler)
     # sim = MySimulatorMultipleInitStates(func, [[0, 0], [0.05, 0.05], [0.1, 0.1]], Dt, NumericalIntegration.euler)
     # sim = MySimulatorMultipleInitStates(func, [[i * 0, i * 0.1] for i in range(25)], Dt, NumericalIntegration.euler)
-    sim = MySimulatorMultipleInitStates(func, initial_states, Dt, NumericalIntegration.euler)
+    # sim = MySimulatorMultipleInitStates(func, initial_states, Dt, NumericalIntegration.euler)
+    # sim = MySimulatorMultipleInitStates(func, equally_spaced_points, Dt, NumericalIntegration.euler)
     # sim = MySimulatorMultipleInitStates(func, [[0, 0]], Dt, NumericalIntegration.euler)
-    # sim = MyFinalStateIterator(brusselator, x0, [0.1, 0.1], [1, 1], Dt, NumericalIntegration.euler, delta = [0.05, 0.05], discard = 15000, samples = 2)
-
+    # sim = MyFinalStateIterator(brusselator, x0, [0.1, 0.1], [4, 4], Dt, NumericalIntegration.euler, delta = [0.3, 0.3], discard = 20000, samples = 100)
+    '''
+    delta = [0.2, 0.2], start = [0.1, 0.1] e end 0 [4, 4] dá erro por overflow.
+    '''
     
     # vis = simcx.visuals.Lines(sim)
-    # vis = OrbitDifferenceVisual(sim, True)
-    # vis = MySimulatorMultipleInitStatesVisual(sim)
+    vis = OrbitDifferenceVisual(sim, system_parameters_str)
+    # vis = MySimulatorMultipleInitStatesVisual(sim, system_parameters_str)
 
-    vis = MyPhaseSpace2DMultipleInitialStates(sim, 'x', 'y')
+    # vis = MyPhaseSpace2DMultipleInitialStates(sim, 'x', 'y', system_parameters, system_parameters_str)
     # vis = Bifurcation3DVisual(sim, 'a', 'b', 'function_output')
     
     display = simcx.Display()
@@ -463,4 +515,6 @@ if '__main__' == __name__:
     display.add_simulator(sim)
     simcx.run()
 
-    print(f'[final values]  x: {sim.y[0][-1]}, y: {sim.y[1][-1]}')
+    # print(f'[final values]  x: {sim.y[0][-1]}, y: {sim.y[1][-1]}')
+
+    
